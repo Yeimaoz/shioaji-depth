@@ -14,7 +14,7 @@ def test_cli_parses_args(monkeypatch):
         async def run(self):
             pass
 
-    monkeypatch.setattr(cli, "TwDepthRecorder", FakeRec)
+    monkeypatch.setattr(cli, "DepthRecorder", FakeRec)
     monkeypatch.setattr(cli.asyncio, "run", lambda coro: coro.close())
     cli.main(
         ["record", "--symbols", "MTX,TMF,TXF", "--data-root", "/tmp/twd",
@@ -38,7 +38,7 @@ def test_cli_diff_vol_flag(monkeypatch):
         async def run(self):
             pass
 
-    monkeypatch.setattr(cli, "TwDepthRecorder", FakeRec)
+    monkeypatch.setattr(cli, "DepthRecorder", FakeRec)
     monkeypatch.setattr(cli.asyncio, "run", lambda coro: coro.close())
     cli.main(["record", "--symbols", "MTX", "--data-root", "/tmp/twd", "--diff-vol"])
     assert captured["kw"]["record_diff_vol"] is True

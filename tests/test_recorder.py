@@ -1,4 +1,4 @@
-"""TwDepthRecorder tests with a mock shioaji BidAskFOPv1 payload.
+"""DepthRecorder tests with a mock shioaji BidAskFOPv1 payload.
 
 The fake payload mirrors the real shioaji._core.BidAskFOPv1 stub:
 - bid_price / ask_price are List[str] (NOT float) -> exercises str->float conversion.
@@ -13,7 +13,7 @@ import math
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-from shioaji_depth.recorder import TwDepthRecorder
+from shioaji_depth.recorder import DepthRecorder
 
 _TPE = ZoneInfo("Asia/Taipei")
 
@@ -46,7 +46,7 @@ class FakeBidAskFOP:
 
 
 def _rec(tmp_path, **kw):
-    return TwDepthRecorder(["MTX"], tmp_path, api_key="K", secret="S", **kw)
+    return DepthRecorder(["MTX"], tmp_path, api_key="K", secret="S", **kw)
 
 
 def test_on_bidask_appends_valid(tmp_path):

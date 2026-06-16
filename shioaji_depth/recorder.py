@@ -1,6 +1,6 @@
 """Taiwan TAIFEX futures 5-level (五檔) order-book depth recorder.
 
-TwDepthRecorder logs into shioaji, resolves each shortcode to its rolling
+DepthRecorder logs into shioaji, resolves each shortcode to its rolling
 front-month contract, subscribes to the BidAsk FOP stream, and on each
 ``on_bidask_fop_v1`` callback parses the best-5 levels into a flat row,
 validates the book, buffers it, and periodically flushes to date-partitioned
@@ -101,7 +101,7 @@ def validate_book(
     return True
 
 
-class TwDepthRecorder:
+class DepthRecorder:
     """Records TAIFEX 5-level (五檔) BidAsk snapshots for a set of symbols.
 
     Args:
@@ -250,7 +250,7 @@ class TwDepthRecorder:
         """
         import shioaji as sj
 
-        print(f"TwDepthRecorder: {len(self.symbols)} symbols x BidAsk FOP (五檔)")
+        print(f"DepthRecorder: {len(self.symbols)} symbols x BidAsk FOP (五檔)")
         print(f"  depth -> {self._data_root}")
         if self.retention_days is not None:
             print(f"  rolling {self.retention_days}-day retention")

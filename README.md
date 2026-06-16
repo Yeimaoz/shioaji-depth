@@ -46,9 +46,9 @@ python -m shioaji_depth record \
 
 ```python
 import asyncio
-from shioaji_depth import TwDepthRecorder
+from shioaji_depth import DepthRecorder
 
-rec = TwDepthRecorder(
+rec = DepthRecorder(
     ["MTX", "TMF", "TXF"],
     "./depth",
     retention_days=30,        # prune files older than 30 days (hourly)

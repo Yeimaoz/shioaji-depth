@@ -14,7 +14,7 @@ import argparse
 import asyncio
 from pathlib import Path
 
-from .recorder import TwDepthRecorder
+from .recorder import DepthRecorder
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -58,7 +58,7 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.command == "record":
         symbols = [s.strip() for s in args.symbols.split(",") if s.strip()]
-        recorder = TwDepthRecorder(
+        recorder = DepthRecorder(
             symbols,
             args.data_root,
             flush_interval_s=args.flush_interval,
