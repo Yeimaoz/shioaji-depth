@@ -1,16 +1,17 @@
 """DepthRecorder tests with a mock shioaji BidAskFOPv1 payload.
 
-The fake payload mirrors the real shioaji._core.BidAskFOPv1 stub:
-- bid_price / ask_price are List[str] (NOT float) -> exercises str->float conversion.
+The fake payload mirrors the LIVE shioaji BidAskFOPv1 (confirmed by a callback
+dump, 2026-06-17):
+- bid_price / ask_price are List[Decimal] -> exercises Decimal->float conversion.
 - bid_volume / ask_volume / diff_*_vol are List[int].
-- datetime is a 7-tuple naive Asia/Taipei local time -> exercises 7-tuple->UTC ms.
-
-NOTE: the exact representation of unfilled tail levels and the simtrade-filter
-behavior are confirmed against the type stub here; final shape requires a live
-callback dump ([NEEDS-ACCOUNT]).
+- datetime is a naive datetime.datetime in Asia/Taipei local time -> exercises
+  datetime->UTC ms. The prior 7-tuple stub assumption was WRONG (the live SDK
+  returns datetime.datetime) and would have recorded zero rows in production —
+  see test_event_datetime_converted_to_utc_ms.
 """
 import math
 from datetime import datetime, timezone
+from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from shioaji_depth.recorder import DepthRecorder
@@ -25,10 +26,10 @@ class FakeBidAskFOP:
         self,
         *,
         code="MXFR1",
-        dt=(2023, 11, 14, 9, 0, 0, 0),
-        bid_price=("100", "99", "98", "97", "96"),
+        dt=datetime(2023, 11, 14, 9, 0, 0),  # naive Asia/Taipei datetime.datetime (live shape)
+        bid_price=(Decimal("100"), Decimal("99"), Decimal("98"), Decimal("97"), Decimal("96")),
         bid_volume=(1, 2, 3, 4, 5),
-        ask_price=("101", "102", "103", "104", "105"),
+        ask_price=(Decimal("101"), Decimal("102"), Decimal("103"), Decimal("104"), Decimal("105")),
         ask_volume=(1, 2, 3, 4, 5),
         diff_bid_vol=(0, 0, 0, 0, 0),
         diff_ask_vol=(0, 0, 0, 0, 0),
@@ -36,9 +37,9 @@ class FakeBidAskFOP:
     ):
         self.code = code
         self.datetime = dt
-        self.bid_price = list(bid_price)   # List[str] — real SDK type
+        self.bid_price = list(bid_price)   # List[Decimal] — real SDK type
         self.bid_volume = list(bid_volume)
-        self.ask_price = list(ask_price)   # List[str] — real SDK type
+        self.ask_price = list(ask_price)   # List[Decimal] — real SDK type
         self.ask_volume = list(ask_volume)
         self.diff_bid_vol = list(diff_bid_vol)
         self.diff_ask_vol = list(diff_ask_vol)
@@ -55,29 +56,38 @@ def test_on_bidask_appends_valid(tmp_path):
     assert len(r._buf["MTX"]) == 1
 
 
-def test_str_prices_converted_to_float(tmp_path):
+def test_decimal_prices_converted_to_float(tmp_path):
     r = _rec(tmp_path)
     r._on_bidask("MTX", FakeBidAskFOP())
     row = r._buf["MTX"][0]
     assert isinstance(row["bid_price_1"], float)
-    assert row["bid_price_1"] == 100.0   # "100" (str) -> 100.0 (float)
-    assert row["ask_price_1"] == 101.0   # "101" (str) -> 101.0 (float)
+    assert row["bid_price_1"] == 100.0   # Decimal("100") -> 100.0 (float)
+    assert row["ask_price_1"] == 101.0   # Decimal("101") -> 101.0 (float)
     assert row["bid_volume_1"] == 1.0
 
 
-def test_event_tuple_converted_to_utc_ms(tmp_path):
+def test_event_datetime_converted_to_utc_ms(tmp_path):
     r = _rec(tmp_path)
-    # 7-tuple naive Asia/Taipei time.
-    r._on_bidask("MTX", FakeBidAskFOP(dt=(2023, 11, 14, 9, 0, 0, 0)))
+    # LIVE shape: a naive datetime.datetime in Asia/Taipei local time.
+    r._on_bidask("MTX", FakeBidAskFOP(dt=datetime(2023, 11, 14, 9, 0, 0)))
     row = r._buf["MTX"][0]
     # Asia/Taipei 09:00 == 01:00 UTC (TWT is UTC+8, no DST).
     expected = int(
-        datetime(2023, 11, 14, 9, 0, 0, 0, tzinfo=_TPE).timestamp() * 1000
+        datetime(2023, 11, 14, 9, 0, 0, tzinfo=_TPE).timestamp() * 1000
     )
     assert row["timestamp_ms"] == expected
     # Sanity: 2023-11-14 09:00 TWT == 2023-11-14 01:00 UTC.
     utc = datetime.fromtimestamp(row["timestamp_ms"] / 1000, tz=timezone.utc)
     assert utc.hour == 1
+
+
+def test_event_legacy_tuple_fallback(tmp_path):
+    # Defensive: a legacy 7-tuple still converts (older stub shape).
+    r = _rec(tmp_path)
+    r._on_bidask("MTX", FakeBidAskFOP(dt=(2023, 11, 14, 9, 0, 0, 0)))
+    row = r._buf["MTX"][0]
+    expected = int(datetime(2023, 11, 14, 9, 0, 0, tzinfo=_TPE).timestamp() * 1000)
+    assert row["timestamp_ms"] == expected
 
 
 def test_partial_book_unfilled_levels_nan(tmp_path):

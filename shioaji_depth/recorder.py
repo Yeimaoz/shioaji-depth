@@ -6,21 +6,22 @@ front-month contract, subscribes to the BidAsk FOP stream, and on each
 validates the book, buffers it, and periodically flushes to date-partitioned
 parquet via parquet_io.
 
-KEY SDK FACTS (confirmed against shioaji._core.BidAskFOPv1 type stub):
-- ``bid_price`` / ``ask_price`` are ``List[str]`` — must be ``float(str)``-converted.
-- ``bid_volume`` / ``ask_volume`` / ``diff_bid_vol`` / ``diff_ask_vol`` are ``List[int]``.
-- ``datetime`` is a 7-tuple ``(year, month, day, hour, minute, second, microsecond)``,
-  NAIVE local time → must be localized to Asia/Taipei, then converted to UTC ms.
-- ``simtrade`` (bool) marks simulated-trading-session ticks; these are dropped.
+KEY SDK FACTS (confirmed by a LIVE callback dump, 2026-06-17, shioaji 1.5.1):
+- ``bid_price`` / ``ask_price`` are ``List[Decimal]`` (live) — ``float(x)``-converted
+  (also tolerates ``str`` from older stubs).
+- ``bid_volume`` / ``ask_volume`` / ``diff_bid_vol`` / ``diff_ask_vol`` are ``List[int]``;
+  ``diff_bid_vol`` / ``diff_ask_vol`` ARE present on the FOP payload (per-level qty delta).
+- ``datetime`` is a NAIVE ``datetime.datetime`` in Asia/Taipei local time → localized to
+  Asia/Taipei, then converted to UTC ms. (A legacy 7-tuple form is accepted defensively.)
+- ``simtrade`` (bool) marks pre-market 試撮 ticks; these are dropped.
 
 Depth is LIVE-ONLY: it cannot be back-filled (no archive). Data only flows
 during the TW trading session; outside it the recorder is idle (no callbacks,
 flush is a no-op) — this is normal, not a fault.
 
-NOTE: the "未滿 5 層的真實表示" (how the SDK encodes fewer than 5 filled levels)
-and the precise simtrade-filter behavior require a one-time live callback dump to
-fully confirm. See README / SKILL.md "[NEEDS-ACCOUNT]". This module assumes
-shorter lists / 0-price entries mark unfilled tail levels.
+NOTE: a liquid night-session dump showed full 5 levels (``len == 5``); the
+unfilled-tail-level case (shallow / far contracts) still trims on the first
+non-finite / 0-price entry. simtrade filtering confirmed against the live payload.
 """
 from __future__ import annotations
 
@@ -44,15 +45,20 @@ _CLEANUP_INTERVAL_S = 3600  # prune retention hourly
 _DEPTH = 5  # 五檔 — best 5 levels per side
 
 
-def _event_tuple_to_utc_ms(dt_tuple: Any) -> int:
-    """Convert a shioaji naive Asia/Taipei 7-tuple to UTC epoch milliseconds.
+def _event_to_utc_ms(dt: Any) -> int:
+    """Convert a shioaji event-time value to UTC epoch milliseconds.
 
-    The shioaji ``datetime`` field is ``(year, month, day, hour, minute, second,
-    microsecond)`` in NAIVE Taipei local time. We localize to Asia/Taipei first,
-    then convert to UTC — never assume it is already UTC.
+    The live shioaji SDK (confirmed by a callback dump, 2026-06-17) delivers
+    ``datetime`` as a NAIVE ``datetime.datetime`` in Asia/Taipei local time. A
+    legacy 7-tuple ``(y, mo, d, h, mi, s, us)`` form is also accepted defensively.
+    Naive values are localized to Asia/Taipei first, then converted to UTC —
+    never assumed to already be UTC.
     """
-    y, mo, d, h, mi, s, us = (int(x) for x in dt_tuple[:7])
-    local = datetime(y, mo, d, h, mi, s, us, tzinfo=_TPE)
+    if isinstance(dt, datetime):
+        local = dt if dt.tzinfo is not None else dt.replace(tzinfo=_TPE)
+    else:  # legacy 7-tuple fallback
+        y, mo, d, h, mi, s, us = (int(x) for x in dt[:7])
+        local = datetime(y, mo, d, h, mi, s, us, tzinfo=_TPE)
     return int(local.timestamp() * 1000)
 
 
@@ -171,7 +177,7 @@ class DepthRecorder:
             return None
 
         row: dict[str, Any] = {
-            "timestamp_ms": _event_tuple_to_utc_ms(getattr(bidask, "datetime"))
+            "timestamp_ms": _event_to_utc_ms(getattr(bidask, "datetime"))
         }
         for i in range(1, _DEPTH + 1):
             idx = i - 1
