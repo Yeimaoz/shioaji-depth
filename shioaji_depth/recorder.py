@@ -225,22 +225,36 @@ class DepthRecorder:
         self._last_cleanup = time.time()
 
     def _resolve_all(self) -> dict[Any, str]:
-        """Resolve every shortcode -> contract; build code->symbol reverse map."""
+        """Resolve every shortcode -> contract; build code->symbol reverse map.
+
+        Live BidAsk callbacks are tagged with the *delivery-month* code (e.g.
+        ``MXFF6``), not the ``R1`` rolling alias used to subscribe (``MXFR1``,
+        confirmed by live dump 2026-06-17), so we also index the 3-char
+        product-group prefix for routing.
+        """
         contracts: dict[Any, str] = {}
         for sym in self.symbols:
             c = resolve_contract(self._api, sym)
             contracts[c] = sym
             code = getattr(c, "code", None)
             if code is not None:
-                self._code_to_symbol[str(code)] = sym
+                self._code_to_symbol[str(code)] = sym        # exact (R1 alias)
+                self._code_to_symbol[str(code)[:3]] = sym    # product-group prefix (MXF/TXF/TMF)
         return contracts
 
     def _make_callback(self):
-        """Build an on_bidask_fop_v1 callback that routes by contract code."""
+        """Build an on_bidask_fop_v1 callback that routes by contract code.
 
-        def _cb(exchange: Any, bidask: Any) -> None:  # noqa: ARG001 — shioaji signature
+        The modern shioaji ``on_bidask_fop_v1`` delivers a SINGLE argument
+        (the BidAskFOPv1 payload) — confirmed by a live callback dump
+        (2026-06-17). The legacy 2-arg ``(exchange, bidask)`` form is gone;
+        registering a 2-arg callback silently raises on every tick (zero rows).
+        """
+
+        def _cb(bidask: Any) -> None:
             code = str(getattr(bidask, "code", ""))
-            symbol = self._code_to_symbol.get(code)
+            # Exact (R1 alias) first, then product-group prefix (live delivery code).
+            symbol = self._code_to_symbol.get(code) or self._code_to_symbol.get(code[:3])
             if symbol is None:
                 return
             self._on_bidask(symbol, bidask)

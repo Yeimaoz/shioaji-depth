@@ -163,12 +163,15 @@ def test_idle_flush_no_callback_not_error(tmp_path):
 
 def test_callback_routes_by_code(tmp_path):
     r = _rec(tmp_path)
-    r._code_to_symbol = {"MXFR1": "MTX"}
+    # _resolve_all indexes both the R1 alias and the 3-char product-group prefix.
+    r._code_to_symbol = {"MXFR1": "MTX", "MXF": "MTX"}
     cb = r._make_callback()
-    cb("TAIFEX", FakeBidAskFOP(code="MXFR1"))
+    # Single-arg payload (live-confirmed 2026-06-17); live quotes carry the
+    # delivery-month code (MXFF6), routed to the symbol via the MXF prefix.
+    cb(FakeBidAskFOP(code="MXFF6"))
     assert len(r._buf["MTX"]) == 1
-    # Unknown code is ignored.
-    cb("TAIFEX", FakeBidAskFOP(code="ZZZR1"))
+    # Unknown product is ignored.
+    cb(FakeBidAskFOP(code="ZZZF6"))
     assert len(r._buf["MTX"]) == 1
 
 

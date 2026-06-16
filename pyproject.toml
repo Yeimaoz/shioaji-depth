@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "shioaji-depth"
-version = "0.1.1"
+version = "0.1.2"
 description = "Generic Taiwan TAIFEX futures 5-level (五檔) order-book depth recorder via SinoPac shioaji SDK -> date-partitioned parquet, with book-invariant validation, atomic writes, rolling retention."
 readme = "README.md"
 license = { file = "LICENSE" }
