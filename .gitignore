@@ -1,0 +1,29 @@
+# Credentials — NEVER commit
+.env
+*.env
+.shioaji/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# shioaji SDK writes a log file on import
+shioaji.log
+*.log
+
+# Test / tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+
+# Data output (parquet recordings)
+*.parquet
+*.parquet.tmp
+*.corrupt-*

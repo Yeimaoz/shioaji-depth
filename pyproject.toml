@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shioaji-depth"
+version = "0.1.0"
+description = "Generic Taiwan TAIFEX futures 5-level (五檔) order-book depth recorder via SinoPac shioaji SDK -> date-partitioned parquet, with book-invariant validation, atomic writes, rolling retention."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+dependencies = [
+    "shioaji>=1.2",
+    "pandas>=2.0",
+    "pyarrow>=15.0",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "pytest-mock>=3.12", "ruff>=0.5"]
+
+[project.scripts]
+shioaji-depth = "shioaji_depth.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["shioaji_depth*"]
+exclude = ["tests*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
