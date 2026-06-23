@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "shioaji-depth"
-version = "0.1.2"
+version = "0.1.3"
 description = "Generic Taiwan TAIFEX futures 5-level (五檔) order-book depth recorder via SinoPac shioaji SDK -> date-partitioned parquet, with book-invariant validation, atomic writes, rolling retention."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
 dependencies = [
-    "shioaji>=1.2",
+    "shioaji>=1.5.3",  # floor: SinoPac deprecated <1.5.3 server-side (503, 2026-06-23)
     "pandas>=2.0",
     "pyarrow>=15.0",
     "python-dotenv>=1.0",
